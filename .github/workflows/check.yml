@@ -1,9 +1,12 @@
 name: Check Colosseum ticket availability
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch: {}
+  # No schedule trigger: GitHub-hosted runners (Azure datacenter IPs) get
+  # blocked by the ticketing site's WAF (Octofence), confirmed by testing --
+  # every scheduled run would just log the same 403 forever. Checks run
+  # locally instead (Windows Task Scheduler on the user's machine, which has
+  # a normal office IP). Kept as workflow_dispatch for manual debugging only.
 
 permissions:
   contents: write
