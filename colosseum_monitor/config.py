@@ -1,0 +1,15 @@
+"""Configuration constants for the Colosseum ticket availability monitor."""
+
+TICKET_URL = "https://ticketing.colosseo.it/eventi/full-experience-sotterranei-e-arena/"
+TICKET_PAGE_ID = 225
+
+TARGET_YEAR = 2026
+TARGET_MONTH = 10
+TARGET_DATES = ["2026-10-23", "2026-10-24", "2026-10-25"]
+
+MONITOR_END_DATE = "2026-10-25"
+
+STATE_PATH = "state.json"
+LOG_PATH = "log.txt"
+
+CONSECUTIVE_FAILURES_ALERT_THRESHOLD = 3
