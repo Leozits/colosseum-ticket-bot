@@ -1,4 +1,35 @@
 {
-  "capacities": {},
-  "consecutive_failures": 1
+  "consecutive_failures": 0,
+  "day_statuses": {
+    "2026-09-01": "soldout",
+    "2026-09-02": "soldout",
+    "2026-09-03": "soldout",
+    "2026-09-04": "soldout",
+    "2026-09-05": "soldout",
+    "2026-09-06": "closing",
+    "2026-09-07": "soldout",
+    "2026-09-08": "soldout",
+    "2026-09-09": "soldout",
+    "2026-09-10": "soldout",
+    "2026-09-11": "soldout",
+    "2026-09-12": "closing",
+    "2026-09-13": "closing",
+    "2026-09-14": "closing",
+    "2026-09-15": "closing",
+    "2026-09-16": "closing",
+    "2026-09-17": "closing",
+    "2026-09-18": "closing",
+    "2026-09-19": "closing",
+    "2026-09-20": "closing",
+    "2026-09-21": "closing",
+    "2026-09-22": "closing",
+    "2026-09-23": "closing",
+    "2026-09-24": "closing",
+    "2026-09-25": "closing",
+    "2026-09-26": "closing",
+    "2026-09-27": "closing",
+    "2026-09-28": "closing",
+    "2026-09-29": "closing",
+    "2026-09-30": "closing"
+  }
 }

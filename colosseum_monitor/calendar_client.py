@@ -1,34 +1,52 @@
-"""Fetches calendar availability data from the ticketing site's internal AJAX endpoint.
+"""Reads real ticket-calendar day statuses from the ticketing site via genuine browser interaction.
 
-The endpoint (/mtajax/calendars_month) sits behind an Octofence WAF that blocks
-plain HTTP requests without a real browser session -- it must be called from
-inside a Playwright page that has already loaded the ticket page, via
-page.evaluate, so the request carries the page's real cookies/session.
+The site's WAF blocks network requests triggered by injected script (e.g. page.evaluate
+calling fetch()), even from an already-loaded, otherwise-legitimate page session --
+confirmed by testing. Real user-driven interaction (mouse clicks dispatched through the
+browser's own input stack) is NOT blocked, since the resulting request is fired by the
+page's own already-loaded jQuery, not by anything we inject. So this module never calls
+page.evaluate for network requests -- it only clicks real elements and reads back the
+resulting DOM state.
 """
 
-
-def build_ajax_payload(page_id, year, month):
-    return {"action": "midaabc_calendars_month", "page": page_id, "year": year, "month": month}
+from colosseum_monitor.availability import parse_calendar_title, classify_day_status
 
 
-_FETCH_SCRIPT = """
-async ({pageId, year, month}) => {
-    const body = new URLSearchParams({
-        action: "midaabc_calendars_month",
-        page: pageId,
-        year: year,
-        month: month,
-    });
-    const resp = await fetch("/mtajax/calendars_month", {
-        method: "POST",
-        headers: {"Content-Type": "application/x-www-form-urlencoded"},
-        body: body,
-    });
-    return await resp.json();
-}
-"""
+def advance_to_max_month(page):
+    """Click the calendar's "next month" arrow until the site's booking horizon is reached."""
+    while True:
+        button = page.query_selector(".ui-datepicker-next")
+        if not button:
+            break
+        css_class = button.get_attribute("class") or ""
+        if "ui-state-disabled" in css_class:
+            break
+        button.click()
+        page.wait_for_timeout(2500)
 
 
-def fetch_month_calendar(page, page_id, year, month):
-    """Fetch the calendar JSON for one month, using an already-navigated Playwright page."""
-    return page.evaluate(_FETCH_SCRIPT, {"pageId": page_id, "year": year, "month": month})
+def read_visible_month_days(page):
+    """Read every day cell in the currently-displayed calendar month.
+
+    Returns {date_str ("YYYY-MM-DD"): status ("soldout" | "closing" | "available" | "unknown")}.
+    """
+    title_element = page.query_selector(".ui-datepicker-title")
+    if not title_element:
+        raise ValueError("Calendar title not found on page")
+    year, month = parse_calendar_title(title_element.inner_text())
+
+    days = {}
+    for cell in page.query_selector_all(".ui-datepicker-calendar td"):
+        link = cell.query_selector("a")
+        span = cell.query_selector("span")
+        text_element = link or span
+        if text_element is None:
+            continue
+        day_text = text_element.inner_text().strip()
+        if not day_text.isdigit():
+            continue
+        css_class = cell.get_attribute("class") or ""
+        status = classify_day_status(css_class, link is not None)
+        date_str = f"{year:04d}-{month:02d}-{int(day_text):02d}"
+        days[date_str] = status
+    return days

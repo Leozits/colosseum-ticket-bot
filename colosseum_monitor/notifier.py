@@ -3,9 +3,9 @@
 import requests
 
 
-def format_availability_message(dates, capacities, ticket_url):
-    lines = [f"- {date}: {capacities[date]} vagas" for date in dates]
-    return "🎟️ Disponibilidade aberta no Coliseu!\n" + "\n".join(lines) + f"\n{ticket_url}"
+def format_availability_message(dates, ticket_url):
+    lines = [f"- {date}" for date in dates]
+    return "🎟️ O calendário do Coliseu abriu para essas datas!\n" + "\n".join(lines) + f"\n{ticket_url}"
 
 
 def format_failure_message(consecutive_failures, error_message):

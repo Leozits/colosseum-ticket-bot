@@ -1,51 +1,77 @@
 import pytest
-from colosseum_monitor.availability import parse_slots, capacity_by_date, find_newly_available
+from colosseum_monitor.availability import (
+    parse_calendar_title,
+    classify_day_status,
+    find_status_changes,
+    find_newly_available,
+)
 
 
-def test_parse_slots_returns_data_list_on_success():
-    response = {"success": True, "data": [{"startDateTime": "2026-10-23T06:45:00Z", "capacity": 5}]}
-    assert parse_slots(response) == response["data"]
+def test_parse_calendar_title_settembre():
+    assert parse_calendar_title("Settembre 2026") == (2026, 9)
 
 
-def test_parse_slots_raises_on_missing_success_flag():
+def test_parse_calendar_title_with_nbsp():
+    assert parse_calendar_title("Ottobre 2026") == (2026, 10)
+
+
+def test_parse_calendar_title_raises_on_unknown_month():
     with pytest.raises(ValueError):
-        parse_slots({"data": []})
+        parse_calendar_title("Blorpuary 2026")
 
 
-def test_parse_slots_raises_on_non_dict_response():
+def test_parse_calendar_title_raises_on_missing_year():
     with pytest.raises(ValueError):
-        parse_slots(["not", "a", "dict"])
+        parse_calendar_title("Settembre")
 
 
-def test_capacity_by_date_sums_multiple_slots_same_day():
-    slots = [
-        {"startDateTime": "2026-10-23T06:45:00Z", "capacity": 5},
-        {"startDateTime": "2026-10-23T07:00:00Z", "capacity": 3},
-        {"startDateTime": "2026-10-24T06:45:00Z", "capacity": 0},
-    ]
-    result = capacity_by_date(slots, ["2026-10-23", "2026-10-24", "2026-10-25"])
-    assert result == {"2026-10-23": 8, "2026-10-24": 0, "2026-10-25": 0}
+def test_classify_day_status_soldout():
+    assert classify_day_status(" ui-datepicker-unselectable ui-state-disabled soldout_day", False) == "soldout"
 
 
-def test_capacity_by_date_ignores_slots_outside_target_dates():
-    slots = [{"startDateTime": "2026-09-01T06:45:00Z", "capacity": 100}]
-    result = capacity_by_date(slots, ["2026-10-23"])
-    assert result == {"2026-10-23": 0}
+def test_classify_day_status_closing():
+    assert classify_day_status(" ui-datepicker-unselectable ui-state-disabled closing_day", False) == "closing"
 
 
-def test_find_newly_available_detects_transition_from_zero():
-    previous = {"2026-10-23": 0, "2026-10-24": 0}
-    current = {"2026-10-23": 0, "2026-10-24": 5}
-    assert find_newly_available(previous, current) == ["2026-10-24"]
+def test_classify_day_status_available_when_linked_and_no_special_class():
+    assert classify_day_status("", True) == "available"
 
 
-def test_find_newly_available_ignores_dates_still_at_zero():
-    previous = {"2026-10-23": 0}
-    current = {"2026-10-23": 0}
+def test_classify_day_status_unknown_when_unlinked_and_no_special_class():
+    assert classify_day_status("ui-datepicker-today", False) == "unknown"
+
+
+def test_find_status_changes_detects_transition():
+    previous = {"2026-09-12": "closing"}
+    current = {"2026-09-12": "soldout"}
+    assert find_status_changes(previous, current) == [{"date": "2026-09-12", "from": "closing", "to": "soldout"}]
+
+
+def test_find_status_changes_ignores_unchanged_dates():
+    previous = {"2026-09-12": "soldout"}
+    current = {"2026-09-12": "soldout"}
+    assert find_status_changes(previous, current) == []
+
+
+def test_find_status_changes_treats_new_date_as_change_from_none():
+    previous = {}
+    current = {"2026-09-13": "closing"}
+    assert find_status_changes(previous, current) == [{"date": "2026-09-13", "from": None, "to": "closing"}]
+
+
+def test_find_newly_available_detects_transition_to_available():
+    previous = {"2026-10-23": "closing"}
+    current = {"2026-10-23": "available"}
+    assert find_newly_available(previous, current) == ["2026-10-23"]
+
+
+def test_find_newly_available_ignores_non_available_transitions():
+    previous = {"2026-09-12": "closing"}
+    current = {"2026-09-12": "soldout"}
     assert find_newly_available(previous, current) == []
 
 
-def test_find_newly_available_treats_unknown_previous_date_as_zero():
-    previous = {}
-    current = {"2026-10-23": 2}
-    assert find_newly_available(previous, current) == ["2026-10-23"]
+def test_find_newly_available_ignores_already_available_dates():
+    previous = {"2026-10-23": "available"}
+    current = {"2026-10-23": "available"}
+    assert find_newly_available(previous, current) == []

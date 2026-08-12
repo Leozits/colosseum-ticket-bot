@@ -7,13 +7,10 @@ from colosseum_monitor.notifier import (
 )
 
 
-def test_format_availability_message_lists_each_opened_date_with_capacity():
-    message = format_availability_message(
-        ["2026-10-24"], {"2026-10-23": 0, "2026-10-24": 5}, "https://example.com/ticket"
-    )
-    assert "2026-10-24: 5 vagas" in message
+def test_format_availability_message_lists_each_opened_date():
+    message = format_availability_message(["2026-10-24"], "https://example.com/ticket")
+    assert "2026-10-24" in message
     assert "https://example.com/ticket" in message
-    assert "2026-10-23" not in message
 
 
 def test_format_failure_message_includes_count_and_error():
