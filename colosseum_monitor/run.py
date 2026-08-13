@@ -91,7 +91,17 @@ def _real_fetch_days():
         try:
             page = browser.new_page()
             page.goto(config.TICKET_URL, wait_until="domcontentloaded")
-            page.wait_for_timeout(8000)  # site shows a "Waiting" holding page before settling
+            # Site shows a "Waiting" holding page before settling into the real
+            # one; wait for the actual calendar rather than guessing a fixed
+            # delay, which was intermittently too short and logged spurious
+            # "Calendar title not found" failures.
+            page.wait_for_selector(".ui-datepicker-title", timeout=30000)
+            # Fresh (non-persistent) browser session -> the cookie consent banner
+            # is present every run and otherwise intercepts clicks on the
+            # calendar's "next month" arrow.
+            accept_cookies_button = page.query_selector("#cookie_action_close_header")
+            if accept_cookies_button:
+                accept_cookies_button.click(force=True)
             advance_to_max_month(page)
             return read_visible_month_days(page)
         finally:

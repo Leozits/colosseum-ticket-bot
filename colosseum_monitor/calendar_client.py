@@ -21,7 +21,12 @@ def advance_to_max_month(page):
         css_class = button.get_attribute("class") or ""
         if "ui-state-disabled" in css_class:
             break
-        button.click()
+        # Various transient elements (loading overlay, sticky header, cookie
+        # banner) can sit on top of this button depending on timing; force=True
+        # dispatches the click at its location regardless -- still a real
+        # browser input event, just skipping Playwright's own "is anything
+        # covering this?" pre-click check.
+        button.click(force=True)
         page.wait_for_timeout(2500)
 
 
