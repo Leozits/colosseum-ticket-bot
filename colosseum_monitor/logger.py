@@ -15,10 +15,6 @@ def format_error_log_line(timestamp, error_message):
     return f"{timestamp} ERROR {error_message}"
 
 
-def format_skip_log_line(timestamp, paused_until):
-    return f"{timestamp} SKIP paused_until={paused_until}"
-
-
 def append_log(path, line):
     with open(path, "a", encoding="utf-8") as f:
         f.write(line + "\n")

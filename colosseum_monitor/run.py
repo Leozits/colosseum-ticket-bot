@@ -9,12 +9,10 @@ from patchright.sync_api import sync_playwright
 from colosseum_monitor import config
 from colosseum_monitor.availability import find_status_changes, find_newly_available
 from colosseum_monitor.state import load_state, save_state
-from colosseum_monitor.schedule_window import next_resume_time
 from colosseum_monitor.logger import (
     format_log_line,
     format_change_log_line,
     format_error_log_line,
-    format_skip_log_line,
     append_log,
 )
 from colosseum_monitor.notifier import (
@@ -52,13 +50,7 @@ def check_once(fetch_days=None, send_message=None, now=None):
         return 0
 
     previous = load_state(config.STATE_PATH)
-    current_time = now()
-    timestamp = current_time.isoformat()
-
-    paused_until = previous.get("paused_until")
-    if paused_until and current_time < datetime.fromisoformat(paused_until):
-        append_log(config.LOG_PATH, format_skip_log_line(timestamp, paused_until))
-        return 0
+    timestamp = now().isoformat()
 
     try:
         current = fetch_days()
@@ -69,11 +61,7 @@ def check_once(fetch_days=None, send_message=None, now=None):
             _notify_safely(send_message, format_failure_message(consecutive_failures, str(exc)), timestamp)
         save_state(
             config.STATE_PATH,
-            {
-                "day_statuses": previous["day_statuses"],
-                "consecutive_failures": consecutive_failures,
-                "paused_until": previous.get("paused_until"),
-            },
+            {"day_statuses": previous["day_statuses"], "consecutive_failures": consecutive_failures},
         )
         return 1
 
@@ -87,16 +75,7 @@ def check_once(fetch_days=None, send_message=None, now=None):
     if newly_available:
         _notify_safely(send_message, format_availability_message(newly_available, config.TICKET_URL), timestamp)
 
-    # Nothing bookable right now -> pause the 15-min cadence until the evening
-    # window instead of polling all day for no reason; any "available" day
-    # keeps checks running at full speed so a live window isn't missed.
-    any_available_now = any(status == "available" for status in current.values())
-    new_paused_until = None if any_available_now else next_resume_time(current_time).isoformat()
-
-    save_state(
-        config.STATE_PATH,
-        {"day_statuses": current, "consecutive_failures": 0, "paused_until": new_paused_until},
-    )
+    save_state(config.STATE_PATH, {"day_statuses": current, "consecutive_failures": 0})
     return 0
 
 

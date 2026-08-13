@@ -1,5 +1,5 @@
 {
-  "consecutive_failures": 0,
+  "consecutive_failures": 2,
   "day_statuses": {
     "2026-09-01": "soldout",
     "2026-09-02": "soldout",
@@ -31,6 +31,5 @@
     "2026-09-28": "closing",
     "2026-09-29": "closing",
     "2026-09-30": "closing"
-  },
-  "paused_until": "2026-08-14T01:00:00+00:00"
+  }
 }
