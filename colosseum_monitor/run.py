@@ -19,6 +19,7 @@ from colosseum_monitor.notifier import (
     format_availability_message,
     format_failure_message,
     send_whatsapp_message,
+    send_email_message,
 )
 from colosseum_monitor.calendar_client import advance_to_max_month, read_visible_month_days
 
@@ -109,11 +110,36 @@ def _real_fetch_days():
 
 
 def _real_send_message(content):
-    send_whatsapp_message(
-        phone=os.environ["WHATSAPP_PHONE"],
-        api_key=os.environ["CALLMEBOT_API_KEY"],
-        text=content,
-    )
+    # Both channels, independently -- CallMeBot's free tier sometimes confirms
+    # "Message queued" for messages that never actually arrive, so email stays
+    # as a backup rather than a straight replacement. Any failure (partial or
+    # total) is reported so it still shows up in the log.
+    errors = []
+
+    try:
+        send_whatsapp_message(
+            phone=os.environ["WHATSAPP_PHONE"],
+            api_key=os.environ["CALLMEBOT_API_KEY"],
+            text=content,
+        )
+    except Exception as exc:
+        errors.append(f"WhatsApp: {exc}")
+
+    try:
+        send_email_message(
+            smtp_host=config.SMTP_HOST,
+            smtp_port=config.SMTP_PORT,
+            username=os.environ["GMAIL_ADDRESS"],
+            password=os.environ["GMAIL_APP_PASSWORD"],
+            to_address=os.environ.get("NOTIFY_TO_EMAIL") or os.environ["GMAIL_ADDRESS"],
+            subject="Monitor Coliseu",
+            body=content,
+        )
+    except Exception as exc:
+        errors.append(f"Email: {exc}")
+
+    if errors:
+        raise RuntimeError("; ".join(errors))
 
 
 if __name__ == "__main__":

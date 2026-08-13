@@ -1,9 +1,10 @@
 import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 from colosseum_monitor.notifier import (
     format_availability_message,
     format_failure_message,
     send_whatsapp_message,
+    send_email_message,
 )
 
 
@@ -48,3 +49,47 @@ def test_send_whatsapp_message_raises_when_not_confirmed(mock_get):
 
     with pytest.raises(RuntimeError):
         send_whatsapp_message("5511985600509", "8502714", "hello")
+
+
+@patch("colosseum_monitor.notifier.smtplib.SMTP")
+def test_send_email_message_logs_in_and_sends(mock_smtp_class):
+    mock_server = MagicMock()
+    mock_smtp_class.return_value.__enter__.return_value = mock_server
+
+    send_email_message(
+        smtp_host="smtp.gmail.com",
+        smtp_port=587,
+        username="me@gmail.com",
+        password="app-password",
+        to_address="me@gmail.com",
+        subject="Subject",
+        body="Body text",
+    )
+
+    mock_smtp_class.assert_called_once_with("smtp.gmail.com", 587, timeout=15)
+    mock_server.starttls.assert_called_once()
+    mock_server.login.assert_called_once_with("me@gmail.com", "app-password")
+    mock_server.send_message.assert_called_once()
+    sent_message = mock_server.send_message.call_args[0][0]
+    assert sent_message["Subject"] == "Subject"
+    assert sent_message["From"] == "me@gmail.com"
+    assert sent_message["To"] == "me@gmail.com"
+    assert sent_message.get_content().strip() == "Body text"
+
+
+@patch("colosseum_monitor.notifier.smtplib.SMTP")
+def test_send_email_message_raises_on_login_failure(mock_smtp_class):
+    mock_server = MagicMock()
+    mock_server.login.side_effect = Exception("auth failed")
+    mock_smtp_class.return_value.__enter__.return_value = mock_server
+
+    with pytest.raises(Exception):
+        send_email_message(
+            smtp_host="smtp.gmail.com",
+            smtp_port=587,
+            username="me@gmail.com",
+            password="wrong",
+            to_address="me@gmail.com",
+            subject="Subject",
+            body="Body",
+        )
