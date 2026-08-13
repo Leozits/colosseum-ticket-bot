@@ -59,13 +59,20 @@ first.
    python -m patchright install chromium
    ```
 
-4. **Register the Windows Scheduled Task** (repeats every 15 min while the PC is on/unlocked; catches up automatically if a run is missed while asleep):
+4. **Register the Windows Scheduled Task** (repeats every 5 min while the PC is on/unlocked; catches up automatically if a run is missed while asleep):
    ```powershell
    $action = New-ScheduledTaskAction -Execute "<path to>\pythonw.exe" -Argument "-m colosseum_monitor.run" -WorkingDirectory "<path to>\colosseum-ticket-bot"
-   $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Days 200)
+   $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 200)
    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
-   Register-ScheduledTask -TaskName "ColosseumTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Colosseum ticket calendar every 15 min while this PC is on; notifies by email."
+   Register-ScheduledTask -TaskName "ColosseumTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Colosseum ticket calendar every 5 min while this PC is on; notifies by email."
    ```
+
+   A real check takes ~20s end to end, so there's no risk of overlapping runs
+   at this interval. The interval was originally 15 min; tightened to 5 min
+   on request to reduce the chance of missing a short opening window.
+   **Don't go much tighter than this** — the site actively fights automation
+   (see WAF notes above), and hitting it dramatically more often than a real
+   person would increases the chance it blocks this session again.
 
 5. **(Optional but recommended) Register the keep-awake task**, so 15-min
    coverage survives this laptop's aggressive sleep whenever it's plugged in
@@ -74,7 +81,7 @@ first.
    $action = New-ScheduledTaskAction -Execute "<path to>\pythonw.exe" -Argument "<path to>\colosseum-ticket-bot\scripts\keep_awake.py" -WorkingDirectory "<path to>\colosseum-ticket-bot"
    $trigger = New-ScheduledTaskTrigger -AtLogOn
    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
-   Register-ScheduledTask -TaskName "KeepAwakeOnAC" -Action $action -Trigger $trigger -Settings $settings -Description "Prevents sleep while on AC power so ColosseumTicketMonitor keeps running every 15 min; does not affect screen lock."
+   Register-ScheduledTask -TaskName "KeepAwakeOnAC" -Action $action -Trigger $trigger -Settings $settings -Description "Prevents sleep while on AC power so ColosseumTicketMonitor keeps running every 5 min; does not affect screen lock."
    ```
 
 The script itself no-ops (does nothing, touches no files) once run after
