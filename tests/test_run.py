@@ -38,6 +38,26 @@ def test_check_once_notifies_when_a_date_becomes_available(tmp_path, monkeypatch
     assert "2026-09-13" in sent[0]
 
 
+def test_check_once_still_saves_state_when_notification_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "STATE_PATH", str(tmp_path / "state.json"))
+    monkeypatch.setattr(config, "LOG_PATH", str(tmp_path / "log.txt"))
+    with open(config.STATE_PATH, "w") as f:
+        json.dump({"day_statuses": {"2026-09-13": "closing"}, "consecutive_failures": 0}, f)
+
+    def broken_send(msg):
+        raise ConnectionError("smtp unreachable")
+
+    result = check_once(fetch_days=lambda: {"2026-09-13": "available"}, send_message=broken_send)
+
+    assert result == 0
+    with open(config.STATE_PATH) as f:
+        state = json.load(f)
+    assert state["day_statuses"] == {"2026-09-13": "available"}
+    with open(config.LOG_PATH) as f:
+        log_contents = f.read()
+    assert "notification failed" in log_contents
+
+
 def test_check_once_skips_entirely_after_monitor_end_date(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "STATE_PATH", str(tmp_path / "state.json"))
     monkeypatch.setattr(config, "LOG_PATH", str(tmp_path / "log.txt"))

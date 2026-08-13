@@ -18,9 +18,20 @@ from colosseum_monitor.logger import (
 from colosseum_monitor.notifier import (
     format_availability_message,
     format_failure_message,
-    send_discord_message,
+    send_email_message,
 )
 from colosseum_monitor.calendar_client import advance_to_max_month, read_visible_month_days
+
+
+def _notify_safely(send_message, content, timestamp):
+    # A notification failure (e.g. the mail server being unreachable) must never
+    # crash the run before save_state() -- that would leave state.json stuck on
+    # the old snapshot forever, so the same "change" gets re-detected and
+    # re-alerted (and re-fails) on every subsequent run indefinitely.
+    try:
+        send_message(content)
+    except Exception as exc:
+        append_log(config.LOG_PATH, format_error_log_line(timestamp, f"notification failed: {exc}"))
 
 
 def check_once(fetch_days=None, send_message=None, now=None):
@@ -47,7 +58,7 @@ def check_once(fetch_days=None, send_message=None, now=None):
         consecutive_failures = previous["consecutive_failures"] + 1
         append_log(config.LOG_PATH, format_error_log_line(timestamp, str(exc)))
         if consecutive_failures >= config.CONSECUTIVE_FAILURES_ALERT_THRESHOLD:
-            send_message(format_failure_message(consecutive_failures, str(exc)))
+            _notify_safely(send_message, format_failure_message(consecutive_failures, str(exc)), timestamp)
         save_state(
             config.STATE_PATH,
             {"day_statuses": previous["day_statuses"], "consecutive_failures": consecutive_failures},
@@ -62,7 +73,7 @@ def check_once(fetch_days=None, send_message=None, now=None):
 
     newly_available = find_newly_available(previous["day_statuses"], current)
     if newly_available:
-        send_message(format_availability_message(newly_available, config.TICKET_URL))
+        _notify_safely(send_message, format_availability_message(newly_available, config.TICKET_URL), timestamp)
 
     save_state(config.STATE_PATH, {"day_statuses": current, "consecutive_failures": 0})
     return 0
@@ -88,8 +99,15 @@ def _real_fetch_days():
 
 
 def _real_send_message(content):
-    webhook_url = os.environ["DISCORD_WEBHOOK_URL"]
-    send_discord_message(webhook_url, content)
+    send_email_message(
+        smtp_host=config.SMTP_HOST,
+        smtp_port=config.SMTP_PORT,
+        username=os.environ["GMAIL_ADDRESS"],
+        password=os.environ["GMAIL_APP_PASSWORD"],
+        to_address=os.environ.get("NOTIFY_TO_EMAIL") or os.environ["GMAIL_ADDRESS"],
+        subject="Monitor Coliseu",
+        body=content,
+    )
 
 
 if __name__ == "__main__":

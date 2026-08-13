@@ -1,9 +1,9 @@
 import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, MagicMock
 from colosseum_monitor.notifier import (
     format_availability_message,
     format_failure_message,
-    send_discord_message,
+    send_email_message,
 )
 
 
@@ -19,19 +19,45 @@ def test_format_failure_message_includes_count_and_error():
     assert "timeout" in message
 
 
-@patch("colosseum_monitor.notifier.requests.post")
-def test_send_discord_message_posts_content_as_json(mock_post):
-    mock_post.return_value = Mock(status_code=204, raise_for_status=Mock())
-    send_discord_message("https://discord.example/webhook", "hello")
-    mock_post.assert_called_once_with(
-        "https://discord.example/webhook", json={"content": "hello"}, timeout=10
+@patch("colosseum_monitor.notifier.smtplib.SMTP")
+def test_send_email_message_logs_in_and_sends(mock_smtp_class):
+    mock_server = MagicMock()
+    mock_smtp_class.return_value.__enter__.return_value = mock_server
+
+    send_email_message(
+        smtp_host="smtp.gmail.com",
+        smtp_port=587,
+        username="me@gmail.com",
+        password="app-password",
+        to_address="me@gmail.com",
+        subject="Subject",
+        body="Body text",
     )
 
+    mock_smtp_class.assert_called_once_with("smtp.gmail.com", 587, timeout=15)
+    mock_server.starttls.assert_called_once()
+    mock_server.login.assert_called_once_with("me@gmail.com", "app-password")
+    mock_server.send_message.assert_called_once()
+    sent_message = mock_server.send_message.call_args[0][0]
+    assert sent_message["Subject"] == "Subject"
+    assert sent_message["From"] == "me@gmail.com"
+    assert sent_message["To"] == "me@gmail.com"
+    assert sent_message.get_content().strip() == "Body text"
 
-@patch("colosseum_monitor.notifier.requests.post")
-def test_send_discord_message_raises_on_http_error(mock_post):
-    mock_response = Mock()
-    mock_response.raise_for_status.side_effect = Exception("500 error")
-    mock_post.return_value = mock_response
+
+@patch("colosseum_monitor.notifier.smtplib.SMTP")
+def test_send_email_message_raises_on_login_failure(mock_smtp_class):
+    mock_server = MagicMock()
+    mock_server.login.side_effect = Exception("auth failed")
+    mock_smtp_class.return_value.__enter__.return_value = mock_server
+
     with pytest.raises(Exception):
-        send_discord_message("https://discord.example/webhook", "hello")
+        send_email_message(
+            smtp_host="smtp.gmail.com",
+            smtp_port=587,
+            username="me@gmail.com",
+            password="wrong",
+            to_address="me@gmail.com",
+            subject="Subject",
+            body="Body",
+        )
