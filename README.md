@@ -1,9 +1,9 @@
 # Colosseum ticket availability monitor
 
 Watches the official Colosseum ticketing site's booking calendar and sends a
-WhatsApp message the moment any date's status changes to "available" — in
-particular the trip dates, Oct 23/24/25 2026, for the "Full Experience -
-Sotterranei e Arena" ticket.
+WhatsApp message and an email the moment any date's status changes to
+"available" — in particular the trip dates, Oct 23/24/25 2026, for the "Full
+Experience - Sotterranei e Arena" ticket.
 
 See `docs/superpowers/specs/2026-08-12-colosseum-ticket-monitor-design.md` for
 the original design and `docs/superpowers/plans/2026-08-12-colosseum-ticket-monitor-plan.md`
@@ -26,10 +26,12 @@ reflected in those docs) — all explained in detail in this file:
    **non-headless** (headless Chromium gets blocked outright); the browser
    window is positioned off-screen (`--window-position=-32000,-32000`) so it
    doesn't pop up in front of you.
-3. **Notifications go by WhatsApp (via [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/)), not Discord.**
+3. **Notifications go by WhatsApp (via [CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/)) *and* email, not Discord.**
    `discord.com` doesn't even resolve on this network — a corporate DNS/firewall
-   block, not something fixable in code. Email (Gmail SMTP) worked as an
-   interim step but was swapped for WhatsApp on request.
+   block, not something fixable in code. Both channels fire on every
+   notification, independently — CallMeBot's free tier has confirmed
+   "Message queued" for a message that never actually arrived, so email
+   stays as a backup rather than WhatsApp being the sole channel.
 
 As of 2026-08-12, the site's calendar for this ticket doesn't extend past
 September 2026 at all yet ("next month" is disabled beyond September) — Oct
@@ -52,18 +54,27 @@ first.
    [Environment]::SetEnvironmentVariable('CALLMEBOT_API_KEY', '<the API key CallMeBot sent you>', 'User')
    ```
 
-3. **Install dependencies and the patchright browser binary**:
+3. **Generate a Gmail app password** for the email backup channel: needs
+   2-Step Verification turned on first (Google Account → Security), then
+   https://myaccount.google.com/apppasswords → create one for this. Store it too:
+   ```powershell
+   [Environment]::SetEnvironmentVariable('GMAIL_ADDRESS', '<your gmail address>', 'User')
+   [Environment]::SetEnvironmentVariable('GMAIL_APP_PASSWORD', '<the 16-char app password, no spaces>', 'User')
+   ```
+   Optionally set `NOTIFY_TO_EMAIL` too if you want alerts sent somewhere other than the Gmail address itself.
+
+4. **Install dependencies and the patchright browser binary**:
    ```bash
    pip install -r requirements.txt
    python -m patchright install chromium
    ```
 
-4. **Register the Windows Scheduled Task** (repeats every 5 min while the PC is on/unlocked; catches up automatically if a run is missed while asleep):
+5. **Register the Windows Scheduled Task** (repeats every 5 min while the PC is on/unlocked; catches up automatically if a run is missed while asleep):
    ```powershell
    $action = New-ScheduledTaskAction -Execute "<path to>\pythonw.exe" -Argument "-m colosseum_monitor.run" -WorkingDirectory "<path to>\colosseum-ticket-bot"
    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 200)
    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
-   Register-ScheduledTask -TaskName "ColosseumTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Colosseum ticket calendar every 5 min while this PC is on; notifies by WhatsApp."
+   Register-ScheduledTask -TaskName "ColosseumTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Colosseum ticket calendar every 5 min while this PC is on; notifies by WhatsApp and email."
    ```
 
    A real check takes ~20s end to end, so there's no risk of overlapping runs
@@ -73,7 +84,7 @@ first.
    (see WAF notes above), and hitting it dramatically more often than a real
    person would increases the chance it blocks this session again.
 
-5. **(Optional but recommended) Register the keep-awake task**, so 15-min
+6. **(Optional but recommended) Register the keep-awake task**, so 5-min
    coverage survives this laptop's aggressive sleep whenever it's plugged in
    (see "Sleep / keep-awake" below for what it does and doesn't affect):
    ```powershell
@@ -119,7 +130,7 @@ python -m pytest tests/ -v
 ## Running a check manually
 
 ```bash
-WHATSAPP_PHONE="<your number>" CALLMEBOT_API_KEY="<api key>" python -m colosseum_monitor.run
+WHATSAPP_PHONE="<your number>" CALLMEBOT_API_KEY="<api key>" GMAIL_ADDRESS="<your gmail>" GMAIL_APP_PASSWORD="<app password>" python -m colosseum_monitor.run
 ```
 
 ## GitHub Actions (disabled)
