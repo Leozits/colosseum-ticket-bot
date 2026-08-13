@@ -1,14 +1,14 @@
 # Colosseum ticket availability monitor
 
-Watches the official Colosseum ticketing site's booking calendar and posts to
-a Discord channel the moment any date's status changes to "available" — in
-particular the trip dates, Oct 23/24/25 2026, for the "Full Experience -
-Sotterranei e Arena" ticket.
+Watches the official Colosseum ticketing site's booking calendar and emails
+you the moment any date's status changes to "available" — in particular the
+trip dates, Oct 23/24/25 2026, for the "Full Experience - Sotterranei e
+Arena" ticket.
 
 See `docs/superpowers/specs/2026-08-12-colosseum-ticket-monitor-design.md` for
 the original design and `docs/superpowers/plans/2026-08-12-colosseum-ticket-monitor-plan.md`
-for how it was built. Two things changed after the initial build (not yet
-reflected in those docs) — both explained in detail in this file:
+for how it was built. Several things changed after the initial build (not yet
+reflected in those docs) — all explained in detail in this file:
 
 1. **It runs locally (Windows Task Scheduler), not on GitHub Actions.** The
    site's WAF (Octofence) blocks GitHub-hosted runners' datacenter IPs.
@@ -26,6 +26,10 @@ reflected in those docs) — both explained in detail in this file:
    **non-headless** (headless Chromium gets blocked outright); the browser
    window is positioned off-screen (`--window-position=-32000,-32000`) so it
    doesn't pop up in front of you.
+3. **Notifications go by email, not Discord.** `discord.com` doesn't even
+   resolve on this network — a corporate DNS/firewall block, not something
+   fixable in code. Gmail SMTP works fine here (confirmed by testing several
+   candidates), so that's what's wired up.
 
 As of 2026-08-12, the site's calendar for this ticket doesn't extend past
 September 2026 at all yet ("next month" is disabled beyond September) — Oct
@@ -38,13 +42,16 @@ first.
 
 ## One-time setup
 
-1. **Create a Discord webhook** in a server/channel you control:
-   Discord → server → channel settings (gear icon) → Integrations → Webhooks → New Webhook → copy the URL.
+1. **Generate a Gmail app password**: needs 2-Step Verification turned on
+   first (Google Account → Security), then
+   https://myaccount.google.com/apppasswords → create one for this.
 
-2. **Store the webhook URL as a user environment variable** (read by the script, never committed):
+2. **Store the Gmail address and app password as user environment variables** (read by the script, never committed):
    ```powershell
-   [Environment]::SetEnvironmentVariable('DISCORD_WEBHOOK_URL', '<paste your webhook URL>', 'User')
+   [Environment]::SetEnvironmentVariable('GMAIL_ADDRESS', '<your gmail address>', 'User')
+   [Environment]::SetEnvironmentVariable('GMAIL_APP_PASSWORD', '<the 16-char app password, no spaces>', 'User')
    ```
+   Optionally set `NOTIFY_TO_EMAIL` too if you want alerts sent somewhere other than the Gmail address itself.
 
 3. **Install dependencies and the patchright browser binary**:
    ```bash
@@ -57,18 +64,41 @@ first.
    $action = New-ScheduledTaskAction -Execute "<path to>\pythonw.exe" -Argument "-m colosseum_monitor.run" -WorkingDirectory "<path to>\colosseum-ticket-bot"
    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Days 200)
    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
-   Register-ScheduledTask -TaskName "ColosseumTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Colosseum ticket calendar every 15 min while this PC is on; notifies via Discord."
+   Register-ScheduledTask -TaskName "ColosseumTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Colosseum ticket calendar every 15 min while this PC is on; notifies by email."
+   ```
+
+5. **(Optional but recommended) Register the keep-awake task**, so 15-min
+   coverage survives this laptop's aggressive sleep whenever it's plugged in
+   (see "Sleep / keep-awake" below for what it does and doesn't affect):
+   ```powershell
+   $action = New-ScheduledTaskAction -Execute "<path to>\pythonw.exe" -Argument "<path to>\colosseum-ticket-bot\scripts\keep_awake.py" -WorkingDirectory "<path to>\colosseum-ticket-bot"
+   $trigger = New-ScheduledTaskTrigger -AtLogOn
+   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+   Register-ScheduledTask -TaskName "KeepAwakeOnAC" -Action $action -Trigger $trigger -Settings $settings -Description "Prevents sleep while on AC power so ColosseumTicketMonitor keeps running every 15 min; does not affect screen lock."
    ```
 
 The script itself no-ops (does nothing, touches no files) once run after
 `MONITOR_END_DATE` in `colosseum_monitor/config.py`, so there's no need to
 remember to disable the task after the trip.
 
-**Known limitation:** this only checks while the laptop is on and unlocked
-(corporate laptops here fully hibernate on sleep, so there's no reliable way
-to wake it on a timer) — it won't catch something opening in the middle of
-the night if the machine is asleep, only whenever it's next used or on the
-next 15-minute tick while awake.
+## Sleep / keep-awake
+
+This laptop hibernates behind a BitLocker pre-boot PIN on sleep (not just a
+screen lock), and Windows can't be told to wake it on a timer for that. The
+`KeepAwakeOnAC` task works around this with `SetThreadExecutionState`, which
+only suppresses the *system sleep* idle timer — it does **not** touch the
+screen lock/screensaver timeout, so the machine still locks normally for
+security. It only holds this while plugged into AC power (checked every 60s);
+on battery it releases the hold and the laptop sleeps normally.
+
+**With `KeepAwakeOnAC` running and the laptop plugged in**: real 15-minute
+coverage, all day, even with the screen locked.
+
+**On battery, or without that task registered**: checks only happen while
+the laptop is actually awake and in use. Windows still runs the missed check
+as soon as possible once you resume using it (`StartWhenAvailable`), so
+there's always a catch-up check right when you sit back down — there's just
+a gap for however long it was actually asleep.
 
 ## Local development
 
@@ -83,7 +113,7 @@ python -m pytest tests/ -v
 ## Running a check manually
 
 ```bash
-DISCORD_WEBHOOK_URL="<webhook url>" python -m colosseum_monitor.run
+GMAIL_ADDRESS="<your gmail>" GMAIL_APP_PASSWORD="<app password>" python -m colosseum_monitor.run
 ```
 
 ## GitHub Actions (disabled)
