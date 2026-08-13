@@ -3,7 +3,7 @@
 import json
 import os
 
-DEFAULT_STATE = {"day_statuses": {}, "consecutive_failures": 0}
+DEFAULT_STATE = {"day_statuses": {}, "consecutive_failures": 0, "paused_until": None}
 
 
 def load_state(path):

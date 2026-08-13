@@ -2,6 +2,7 @@ from colosseum_monitor.logger import (
     format_log_line,
     format_change_log_line,
     format_error_log_line,
+    format_skip_log_line,
     append_log,
 )
 
@@ -23,6 +24,11 @@ def test_format_change_log_line_lists_each_transition():
 def test_format_error_log_line_includes_message():
     line = format_error_log_line("2026-08-12T10:00:00+00:00", "boom")
     assert line == "2026-08-12T10:00:00+00:00 ERROR boom"
+
+
+def test_format_skip_log_line_includes_paused_until():
+    line = format_skip_log_line("2026-08-13T14:00:00+00:00", "2026-08-14T01:00:00+00:00")
+    assert line == "2026-08-13T14:00:00+00:00 SKIP paused_until=2026-08-14T01:00:00+00:00"
 
 
 def test_append_log_appends_without_truncating(tmp_path):
