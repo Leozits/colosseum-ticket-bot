@@ -145,3 +145,33 @@ WHATSAPP_PHONE="<your number>" CALLMEBOT_API_KEY="<api key>" GMAIL_ADDRESS="<you
 `.github/workflows/check.yml` is kept as `workflow_dispatch`-only (manual
 trigger) for debugging — its scheduled cron trigger was removed because
 GitHub-hosted runners get the same WAF block described above.
+
+## Louvre monitor
+
+Same idea as the Colosseum monitor above, watching
+`https://ticket.louvre.fr/en/billetterie/3313` for dates 14–19 October 2026
+(the user's Paris trip window) instead. Shares the same WhatsApp/email
+credentials and setup — no new one-time setup needed beyond what's above.
+
+The Louvre site is behind Cloudflare bot management rather than Octofence,
+but the fix is identical: patchright, non-headless, off-screen window. Its
+calendar exposes each day as a checkbox with a `disabled` attribute rather
+than day-cell CSS classes, but the underlying "drive it like a real user"
+approach carries over unchanged. Calendar month navigation is driven by
+clicking the real "next"/"previous" arrows and then polling the visible
+month header until it actually shows the expected month — a fixed delay
+after each click was intermittently too short, and waiting on the site's
+own network response event proved unreliable in practice.
+
+Register its own Scheduled Task (independent of the Colosseum one, same
+5-minute cadence):
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "<path to>\pythonw.exe" -Argument "-m louvre_monitor.run" -WorkingDirectory "<path to>\colosseum-ticket-bot"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 200)
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName "LouvreTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Louvre ticket calendar every 5 min while this PC is on; notifies by WhatsApp and email."
+```
+
+State and logs live in `louvre_monitor/state.json` and `louvre_monitor/log.txt`
+(kept separate from the Colosseum monitor's files at the repo root).
