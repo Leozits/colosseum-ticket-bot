@@ -146,25 +146,34 @@ WHATSAPP_PHONE="<your number>" CALLMEBOT_API_KEY="<api key>" GMAIL_ADDRESS="<you
 trigger) for debugging — its scheduled cron trigger was removed because
 GitHub-hosted runners get the same WAF block described above.
 
-## Louvre monitor (temporarily paused)
+## Louvre monitor (paused — blocked longer than expected)
 
-**As of 2026-08-17 ~17:15 UTC the `LouvreTicketMonitor` Scheduled Task was
-disabled for a cooldown.** After heavy live testing during development (many
-requests in a short window, well above normal usage), the site started
-failing almost every run with "Calendar did not advance past ..." —
-consistent with Cloudflare's adaptive bot-management pushing back on this
-session specifically, not a code bug. Continuing to hit it every 5 minutes
-while blocked risks reinforcing the block, so it was paused to let it cool
-down for about 4 hours.
+**As of 2026-08-17 the `LouvreTicketMonitor` Scheduled Task is disabled,
+indefinitely this time.** Timeline:
 
-A one-time helper task, `LouvreTicketMonitor-Reenable`
-(`scripts/reenable_louvre.ps1`), automatically re-enables
-`LouvreTicketMonitor` at 19:03 local time on 2026-08-17 and then removes
-itself — no manual step needed. After that, check `louvre_monitor/log.txt`
-for fresh `OK` lines to confirm it's actually healthy again; if it's still
-showing `ERROR Calendar did not advance`, disable it again
-(`Disable-ScheduledTask -TaskName "LouvreTicketMonitor"`) and give it a
-longer cooldown.
+1. ~17:15 UTC: after heavy live testing during development, the site started
+   failing almost every run with `ERROR Calendar did not advance past
+   2026-08` — the Cloudflare challenge was passing, but calendar navigation
+   afterward wasn't. Paused for a 4-hour cooldown, expecting adaptive
+   rate-limiting to expire.
+2. ~22:03 UTC: auto-reactivated as planned. Still failing 100% of the time,
+   same error, no improvement from the cooldown.
+3. ~22:57 UTC: a single manual diagnostic check found it's actually gotten
+   *worse* — the Cloudflare "Just a moment..." interstitial itself now
+   doesn't resolve within 30 seconds (`Page.wait_for_selector: Timeout
+   30000ms exceeded ... waiting for locator(".d-month")`), where earlier
+   runs got past that step fine. This looks like a harder/longer-lived block
+   than a simple short-term rate limit, not something a few more hours will
+   necessarily fix — and not a code bug (`monitor_common`'s engine is
+   correctly logging every failure and retrying, exactly as designed).
+
+**No further auto-reactivation is scheduled this time** — a second
+short-cooldown guess already failed once, so re-enabling
+(`Enable-ScheduledTask -TaskName "LouvreTicketMonitor"`) is left as a manual
+decision. Give it considerably longer than 4 hours (a full day, or more) and
+check for a stretch of real `OK` lines in `louvre_monitor/log.txt` before
+trusting it's healthy — a single success isn't enough given how it flapped
+between "fine" and "100% blocked" earlier in the same session.
 
 Same idea as the Colosseum monitor above, watching
 `https://ticket.louvre.fr/en/billetterie/3313` for dates 14–19 October 2026
