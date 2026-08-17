@@ -16,12 +16,8 @@ from monitor_common.logger import (
     format_error_log_line,
     append_log,
 )
-from colosseum_monitor.notifier import (
-    format_availability_message,
-    format_failure_message,
-    send_whatsapp_message,
-    send_email_message,
-)
+from colosseum_monitor.notifier import format_availability_message, format_failure_message
+from monitor_common.notifier import send_whatsapp_message, send_email_message
 from colosseum_monitor.calendar_client import (
     advance_to_max_month,
     read_visible_month_days,
