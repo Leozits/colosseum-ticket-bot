@@ -175,3 +175,35 @@ Register-ScheduledTask -TaskName "LouvreTicketMonitor" -Action $action -Trigger 
 
 State and logs live in `louvre_monitor/state.json` and `louvre_monitor/log.txt`
 (kept separate from the Colosseum monitor's files at the repo root).
+
+## Versailles monitor
+
+Same idea again, watching `https://ticket.chateauversailles.fr` (Passport
+ticket: château + gardens + Trianon Estate) for dates 14–19 October 2026.
+Shares the same WhatsApp/email credentials and setup — no new one-time setup
+needed.
+
+Unlike the other two monitors, Versailles's calendar endpoint has **no
+bot-blocking at all** — confirmed by a direct, cookie-less request returning
+real data. This monitor makes a plain HTTP call and never opens a browser,
+so it's much lighter and faster than the Colosseum/Louvre ones.
+
+Register its own Scheduled Task (independent of the other two, same 5-minute
+cadence):
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "<path to>\pythonw.exe" -Argument "-m versailles_monitor.run" -WorkingDirectory "<path to>\colosseum-ticket-bot"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 200)
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName "VersaillesTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Versailles ticket calendar every 5 min; notifies by WhatsApp and email."
+```
+
+State and logs live in `versailles_monitor/state.json` and
+`versailles_monitor/log.txt`.
+
+**Note on what "open" means:** the calendar endpoint's `open` class reflects
+whether the château accepts visitors that day at all, not necessarily
+confirmed remaining quota for the Passport ticket specifically (that would
+only be knowable further into the booking flow, which this monitor does not
+drive). Day-level only, same scope as the other two monitors — see the
+design doc for details.
