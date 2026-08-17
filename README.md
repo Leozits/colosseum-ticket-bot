@@ -39,6 +39,14 @@ reflected in those docs) — all explained in detail in this file:
    clickable) reveals a per-time-slot radio list; each carries a `disabled`
    attribute and a "Vendita chiusa o sold out" label when that exact time is
    unavailable. Only fetched for days already "available" at the day level.
+5. **It never alerts about its own failures, only about real ticket
+   availability.** Originally it sent a WhatsApp+email alert once 3 checks
+   in a row failed — and kept re-sending that same alert on every failed run
+   after that. A prolonged outage (see the Louvre section below) burned
+   through CallMeBot's free-tier message quota this way. Failures are still
+   logged and counted (`consecutive_failures` in `state.json`) for
+   diagnostics, just never turned into a notification, for any of the three
+   monitors in this repo.
 
 As of 2026-08-12, the site's calendar for this ticket doesn't extend past
 September 2026 at all yet ("next month" is disabled beyond September) — Oct
@@ -167,13 +175,17 @@ indefinitely this time.** Timeline:
    necessarily fix — and not a code bug (`monitor_common`'s engine is
    correctly logging every failure and retrying, exactly as designed).
 
-**No further auto-reactivation is scheduled this time** — a second
-short-cooldown guess already failed once, so re-enabling
-(`Enable-ScheduledTask -TaskName "LouvreTicketMonitor"`) is left as a manual
-decision. Give it considerably longer than 4 hours (a full day, or more) and
-check for a stretch of real `OK` lines in `louvre_monitor/log.txt` before
-trusting it's healthy — a single success isn't enough given how it flapped
-between "fine" and "100% blocked" earlier in the same session.
+**A one-time retest is scheduled for 2026-08-18 20:20 local time** — a full
+24h after the block was last observed (a longer cooldown than the 4h one
+that already failed once). `LouvreTicketMonitor-Retest`
+(`scripts/retest_louvre.ps1`) runs the monitor exactly once at that time and
+only re-enables the regular 5-min `LouvreTicketMonitor` task if that single
+check actually logs a real `OK` line; if it still fails, it just leaves
+things disabled and removes itself, silently — no failure alerts are sent
+(see below), so check `louvre_monitor/log.txt` afterward yourself to see
+which way it went. If it's still blocked at that point, register another
+one-time retest further out rather than assuming a fixed cooldown will work
+— this one already needed adjusting once.
 
 Same idea as the Colosseum monitor above, watching
 `https://ticket.louvre.fr/en/billetterie/3313` for dates 14–19 October 2026
