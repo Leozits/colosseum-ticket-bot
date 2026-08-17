@@ -1,4 +1,4 @@
-from colosseum_monitor.logger import (
+from monitor_common.logger import (
     format_log_line,
     format_change_log_line,
     format_error_log_line,

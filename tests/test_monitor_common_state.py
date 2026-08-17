@@ -1,5 +1,5 @@
 import json
-from colosseum_monitor.state import load_state, save_state, DEFAULT_STATE
+from monitor_common.state import load_state, save_state, DEFAULT_STATE
 
 
 def test_default_state_shape():
