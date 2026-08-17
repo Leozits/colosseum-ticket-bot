@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from patchright.sync_api import sync_playwright
 
 from colosseum_monitor import config
-from colosseum_monitor.availability import find_status_changes, find_newly_available
+from monitor_common.diff import find_status_changes, find_newly_available
 from monitor_common.state import load_state, save_state
 from monitor_common.logger import (
     format_log_line,

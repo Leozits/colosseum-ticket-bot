@@ -38,22 +38,3 @@ def classify_day_status(css_class, is_link):
 def classify_slot_status(is_disabled):
     """Classify a time-slot radio input from whether it carries the disabled attribute."""
     return "closed" if is_disabled else "available"
-
-
-def find_status_changes(previous, current):
-    """Return every date whose status differs from its previous recorded status."""
-    changes = []
-    for date_str, status in current.items():
-        prev_status = previous.get(date_str)
-        if prev_status != status:
-            changes.append({"date": date_str, "from": prev_status, "to": status})
-    return changes
-
-
-def find_newly_available(previous, current):
-    """Return dates that just became "available" (weren't before, or weren't tracked)."""
-    return [
-        date_str
-        for date_str, status in current.items()
-        if status == "available" and previous.get(date_str) != "available"
-    ]
