@@ -2,8 +2,9 @@
 
 Watches the official Colosseum ticketing site's booking calendar and sends a
 WhatsApp message and an email the moment any date's status changes to
-"available" — in particular the trip dates, Oct 23/24/25 2026, for the "Full
-Experience - Sotterranei e Arena" ticket.
+"available" — including exactly which visit times are bookable that day —
+in particular the trip dates, Oct 23/24/25 2026, for the "Full Experience -
+Sotterranei e Arena" ticket.
 
 See `docs/superpowers/specs/2026-08-12-colosseum-ticket-monitor-design.md` for
 the original design and `docs/superpowers/plans/2026-08-12-colosseum-ticket-monitor-plan.md`
@@ -32,6 +33,12 @@ reflected in those docs) — all explained in detail in this file:
    notification, independently — CallMeBot's free tier has confirmed
    "Message queued" for a message that never actually arrived, so email
    stays as a backup rather than WhatsApp being the sole channel.
+4. **It also reports which specific visit times are open, not just that the
+   day is "available".** Clicking a bookable day (a genuine click, same
+   WAF-safe pattern as month navigation — soldout/closing days aren't even
+   clickable) reveals a per-time-slot radio list; each carries a `disabled`
+   attribute and a "Vendita chiusa o sold out" label when that exact time is
+   unavailable. Only fetched for days already "available" at the day level.
 
 As of 2026-08-12, the site's calendar for this ticket doesn't extend past
 September 2026 at all yet ("next month" is disabled beyond September) — Oct
