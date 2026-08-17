@@ -146,7 +146,18 @@ WHATSAPP_PHONE="<your number>" CALLMEBOT_API_KEY="<api key>" GMAIL_ADDRESS="<you
 trigger) for debugging — its scheduled cron trigger was removed because
 GitHub-hosted runners get the same WAF block described above.
 
-## Louvre monitor
+## Louvre monitor (temporarily paused)
+
+**As of 2026-08-17 ~17:15 UTC the `LouvreTicketMonitor` Scheduled Task is
+disabled.** After heavy live testing during development (many requests in a
+short window, well above normal usage), the site started failing almost
+every run with "Calendar did not advance past ..." — consistent with
+Cloudflare's adaptive bot-management pushing back on this session
+specifically, not a code bug. Continuing to hit it every 5 minutes while
+blocked risks reinforcing the block, so it's paused to let it cool down.
+Re-enable with `Enable-ScheduledTask -TaskName "LouvreTicketMonitor"` after
+waiting a few hours — check `louvre_monitor/log.txt` afterward to confirm
+`OK` lines are back before assuming it's healthy again.
 
 Same idea as the Colosseum monitor above, watching
 `https://ticket.louvre.fr/en/billetterie/3313` for dates 14–19 October 2026
