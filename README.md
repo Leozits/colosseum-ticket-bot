@@ -148,16 +148,23 @@ GitHub-hosted runners get the same WAF block described above.
 
 ## Louvre monitor (temporarily paused)
 
-**As of 2026-08-17 ~17:15 UTC the `LouvreTicketMonitor` Scheduled Task is
-disabled.** After heavy live testing during development (many requests in a
-short window, well above normal usage), the site started failing almost
-every run with "Calendar did not advance past ..." — consistent with
-Cloudflare's adaptive bot-management pushing back on this session
-specifically, not a code bug. Continuing to hit it every 5 minutes while
-blocked risks reinforcing the block, so it's paused to let it cool down.
-Re-enable with `Enable-ScheduledTask -TaskName "LouvreTicketMonitor"` after
-waiting a few hours — check `louvre_monitor/log.txt` afterward to confirm
-`OK` lines are back before assuming it's healthy again.
+**As of 2026-08-17 ~17:15 UTC the `LouvreTicketMonitor` Scheduled Task was
+disabled for a cooldown.** After heavy live testing during development (many
+requests in a short window, well above normal usage), the site started
+failing almost every run with "Calendar did not advance past ..." —
+consistent with Cloudflare's adaptive bot-management pushing back on this
+session specifically, not a code bug. Continuing to hit it every 5 minutes
+while blocked risks reinforcing the block, so it was paused to let it cool
+down for about 4 hours.
+
+A one-time helper task, `LouvreTicketMonitor-Reenable`
+(`scripts/reenable_louvre.ps1`), automatically re-enables
+`LouvreTicketMonitor` at 19:03 local time on 2026-08-17 and then removes
+itself — no manual step needed. After that, check `louvre_monitor/log.txt`
+for fresh `OK` lines to confirm it's actually healthy again; if it's still
+showing `ERROR Calendar did not advance`, disable it again
+(`Disable-ScheduledTask -TaskName "LouvreTicketMonitor"`) and give it a
+longer cooldown.
 
 Same idea as the Colosseum monitor above, watching
 `https://ticket.louvre.fr/en/billetterie/3313` for dates 14–19 October 2026
