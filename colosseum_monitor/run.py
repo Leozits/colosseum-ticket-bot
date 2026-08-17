@@ -12,6 +12,7 @@ from colosseum_monitor.state import load_state, save_state
 from colosseum_monitor.logger import (
     format_log_line,
     format_change_log_line,
+    format_slots_log_line,
     format_error_log_line,
     append_log,
 )
@@ -21,7 +22,12 @@ from colosseum_monitor.notifier import (
     send_whatsapp_message,
     send_email_message,
 )
-from colosseum_monitor.calendar_client import advance_to_max_month, read_visible_month_days
+from colosseum_monitor.calendar_client import (
+    advance_to_max_month,
+    read_visible_month_days,
+    click_day,
+    read_time_slots,
+)
 
 
 def _notify_safely(send_message, content, timestamp):
@@ -38,7 +44,9 @@ def _notify_safely(send_message, content, timestamp):
 def check_once(fetch_days=None, send_message=None, now=None):
     """Run one availability check. Dependencies are injectable for testing.
 
-    fetch_days: callable() -> dict[date_str, status] (the visible calendar's day statuses)
+    fetch_days: callable() -> {"statuses": dict[date_str, status],
+                                "slots": dict[date_str, dict[time_str, status]]}
+                (slots is only populated for dates whose status is "available")
     send_message: callable(str) -> None
     now: callable() -> datetime (timezone-aware, UTC)
     """
@@ -54,7 +62,7 @@ def check_once(fetch_days=None, send_message=None, now=None):
     timestamp = now().isoformat()
 
     try:
-        current = fetch_days()
+        result = fetch_days()
     except Exception as exc:
         consecutive_failures = previous["consecutive_failures"] + 1
         append_log(config.LOG_PATH, format_error_log_line(timestamp, str(exc)))
@@ -62,11 +70,20 @@ def check_once(fetch_days=None, send_message=None, now=None):
             _notify_safely(send_message, format_failure_message(consecutive_failures, str(exc)), timestamp)
         save_state(
             config.STATE_PATH,
-            {"day_statuses": previous["day_statuses"], "consecutive_failures": consecutive_failures},
+            {
+                "day_statuses": previous["day_statuses"],
+                "available_slots": previous.get("available_slots", {}),
+                "consecutive_failures": consecutive_failures,
+            },
         )
         return 1
 
+    current = result["statuses"]
+    current_slots = result["slots"]
+
     append_log(config.LOG_PATH, format_log_line(timestamp, current))
+    if current_slots:
+        append_log(config.LOG_PATH, format_slots_log_line(timestamp, current_slots))
 
     changes = find_status_changes(previous["day_statuses"], current)
     if changes:
@@ -74,9 +91,13 @@ def check_once(fetch_days=None, send_message=None, now=None):
 
     newly_available = find_newly_available(previous["day_statuses"], current)
     if newly_available:
-        _notify_safely(send_message, format_availability_message(newly_available, config.TICKET_URL), timestamp)
+        message = format_availability_message(newly_available, current_slots, config.TICKET_URL)
+        _notify_safely(send_message, message, timestamp)
 
-    save_state(config.STATE_PATH, {"day_statuses": current, "consecutive_failures": 0})
+    save_state(
+        config.STATE_PATH,
+        {"day_statuses": current, "available_slots": current_slots, "consecutive_failures": 0},
+    )
     return 0
 
 
@@ -104,7 +125,21 @@ def _real_fetch_days():
             if accept_cookies_button:
                 accept_cookies_button.click(force=True)
             advance_to_max_month(page)
-            return read_visible_month_days(page)
+            statuses = read_visible_month_days(page)
+
+            # Only "available" days are clickable at all (soldout/closing days
+            # render as <span>, not <a>) -- so this only ever runs for the
+            # handful of dates actually worth knowing the exact times for.
+            slots = {}
+            for date_str, status in statuses.items():
+                if status != "available":
+                    continue
+                day_number = int(date_str[-2:])
+                if click_day(page, day_number):
+                    page.wait_for_selector(".abc-slotpicker", timeout=15000)
+                    slots[date_str] = read_time_slots(page)
+
+            return {"statuses": statuses, "slots": slots}
         finally:
             browser.close()
 

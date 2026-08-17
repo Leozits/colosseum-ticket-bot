@@ -9,7 +9,7 @@ page.evaluate for network requests -- it only clicks real elements and reads bac
 resulting DOM state.
 """
 
-from colosseum_monitor.availability import parse_calendar_title, classify_day_status
+from colosseum_monitor.availability import parse_calendar_title, classify_day_status, classify_slot_status
 
 
 def advance_to_max_month(page):
@@ -55,3 +55,32 @@ def read_visible_month_days(page):
         date_str = f"{year:04d}-{month:02d}-{int(day_text):02d}"
         days[date_str] = status
     return days
+
+
+def click_day(page, day_number):
+    """Click the cell for a given day-of-month (int) in the currently-visible month.
+
+    Returns True if a clickable (i.e. available) cell was found and clicked.
+    """
+    for cell in page.query_selector_all(".ui-datepicker-calendar td"):
+        link = cell.query_selector("a")
+        if link and link.inner_text().strip() == str(day_number):
+            link.click(force=True)
+            return True
+    return False
+
+
+def read_time_slots(page):
+    """Read the time-slot picker for whichever day was just clicked via click_day().
+
+    Returns {time_str ("HH:MM"): status ("closed" | "available")}.
+    """
+    slots = {}
+    for label in page.query_selector_all(".abc-slotpicker label"):
+        input_element = label.query_selector("input[name='slot']")
+        if input_element is None:
+            continue
+        time_text = label.inner_text()[:5]
+        is_disabled = input_element.get_attribute("disabled") is not None
+        slots[time_text] = classify_slot_status(is_disabled)
+    return slots

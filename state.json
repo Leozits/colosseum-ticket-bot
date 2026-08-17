@@ -1,4 +1,18 @@
 {
+  "available_slots": {
+    "2026-09-16": {
+      "08:45": "closed",
+      "09:00": "closed",
+      "09:45": "closed",
+      "10:30": "closed",
+      "12:00": "closed",
+      "12:15": "closed",
+      "13:00": "closed",
+      "13:30": "closed",
+      "13:45": "closed",
+      "14:15": "available"
+    }
+  },
   "consecutive_failures": 0,
   "day_statuses": {
     "2026-09-01": "soldout",
@@ -13,10 +27,10 @@
     "2026-09-10": "soldout",
     "2026-09-11": "soldout",
     "2026-09-12": "soldout",
-    "2026-09-13": "closing",
-    "2026-09-14": "closing",
-    "2026-09-15": "closing",
-    "2026-09-16": "closing",
+    "2026-09-13": "soldout",
+    "2026-09-14": "soldout",
+    "2026-09-15": "soldout",
+    "2026-09-16": "available",
     "2026-09-17": "closing",
     "2026-09-18": "closing",
     "2026-09-19": "closing",

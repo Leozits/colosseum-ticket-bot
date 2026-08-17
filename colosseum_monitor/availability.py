@@ -35,6 +35,11 @@ def classify_day_status(css_class, is_link):
     return "unknown"
 
 
+def classify_slot_status(is_disabled):
+    """Classify a time-slot radio input from whether it carries the disabled attribute."""
+    return "closed" if is_disabled else "available"
+
+
 def find_status_changes(previous, current):
     """Return every date whose status differs from its previous recorded status."""
     changes = []

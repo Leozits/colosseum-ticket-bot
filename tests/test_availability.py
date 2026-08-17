@@ -2,6 +2,7 @@ import pytest
 from colosseum_monitor.availability import (
     parse_calendar_title,
     classify_day_status,
+    classify_slot_status,
     find_status_changes,
     find_newly_available,
 )
@@ -39,6 +40,14 @@ def test_classify_day_status_available_when_linked_and_no_special_class():
 
 def test_classify_day_status_unknown_when_unlinked_and_no_special_class():
     assert classify_day_status("ui-datepicker-today", False) == "unknown"
+
+
+def test_classify_slot_status_closed_when_disabled():
+    assert classify_slot_status(True) == "closed"
+
+
+def test_classify_slot_status_available_when_not_disabled():
+    assert classify_slot_status(False) == "available"
 
 
 def test_find_status_changes_detects_transition():

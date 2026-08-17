@@ -15,6 +15,14 @@ def format_error_log_line(timestamp, error_message):
     return f"{timestamp} ERROR {error_message}"
 
 
+def format_slots_log_line(timestamp, slots_by_date):
+    parts = []
+    for date, slots in sorted(slots_by_date.items()):
+        available_times = sorted(t for t, status in slots.items() if status == "available")
+        parts.append(f"{date}:[{','.join(available_times)}]")
+    return f"{timestamp} SLOTS {' '.join(parts)}"
+
+
 def append_log(path, line):
     with open(path, "a", encoding="utf-8") as f:
         f.write(line + "\n")
