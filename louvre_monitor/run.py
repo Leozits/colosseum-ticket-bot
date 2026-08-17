@@ -40,10 +40,17 @@ def _real_fetch_days():
             # own once its JS challenge passes; wait for the real calendar
             # rather than guessing a fixed delay.
             page.wait_for_selector(".d-month", timeout=30000)
+            # The month/year header can render before the day checkboxes
+            # (a separate async load) -- confirmed by testing: reading days
+            # right after the header appeared intermittently returned zero
+            # checkboxes. Wait for at least one real day before touching
+            # navigation or reading data.
+            page.wait_for_selector("#calendarContainer input[data-date]", timeout=15000)
             decline_cookies_button = page.query_selector(".orejime-Notice-declineButton")
             if decline_cookies_button:
                 decline_cookies_button.click(force=True)
             navigate_to_month(page, config.CALENDAR_YEAR, config.CALENDAR_MONTH)
+            page.wait_for_selector("#calendarContainer input[data-date]", timeout=15000)
             all_days = read_month_days(page)
             statuses = {date: status for date, status in all_days.items() if date in config.TARGET_DATES}
             return {"statuses": statuses, "slots": {}}
