@@ -176,7 +176,15 @@ Register-ScheduledTask -TaskName "LouvreTicketMonitor" -Action $action -Trigger 
 State and logs live in `louvre_monitor/state.json` and `louvre_monitor/log.txt`
 (kept separate from the Colosseum monitor's files at the repo root).
 
-## Versailles monitor
+## Versailles monitor (disabled)
+
+**As of 2026-08-17 the `VersaillesTicketMonitor` Scheduled Task is disabled.**
+The user confirmed by checking the official site directly that tickets for
+the trip window are already purchasable, making automated monitoring
+unnecessary for now. The code is left in place — re-enable with
+`Enable-ScheduledTask -TaskName "VersaillesTicketMonitor"` if needed again
+later (e.g. a future trip, or if availability changes and it's worth
+watching once more).
 
 Same idea again, watching `https://ticket.chateauversailles.fr` (Passport
 ticket: château + gardens + Trianon Estate) for dates 14–19 October 2026.
