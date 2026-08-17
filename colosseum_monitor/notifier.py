@@ -16,10 +16,3 @@ def format_availability_message(dates, slots_by_date, ticket_url):
         else:
             lines.append(f"- {date}")
     return "O calendário do Coliseu abriu para essas datas!\n" + "\n".join(lines) + f"\n{ticket_url}"
-
-
-def format_failure_message(consecutive_failures, error_message):
-    return (
-        f"O monitor do Coliseu falhou {consecutive_failures} vezes seguidas.\n"
-        f"Último erro: {error_message}"
-    )

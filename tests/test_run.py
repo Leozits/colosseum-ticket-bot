@@ -118,11 +118,11 @@ def test_check_once_logs_error_and_counts_failures_without_crashing(tmp_path, mo
     assert state["consecutive_failures"] == 1
 
 
-def test_check_once_alerts_after_threshold_consecutive_failures(tmp_path, monkeypatch):
+def test_check_once_never_alerts_no_matter_how_many_consecutive_failures(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "STATE_PATH", str(tmp_path / "state.json"))
     monkeypatch.setattr(config, "LOG_PATH", str(tmp_path / "log.txt"))
     with open(config.STATE_PATH, "w") as f:
-        json.dump({"day_statuses": {}, "available_slots": {}, "consecutive_failures": 2}, f)
+        json.dump({"day_statuses": {}, "available_slots": {}, "consecutive_failures": 10}, f)
 
     def boom():
         raise RuntimeError("site unreachable")
@@ -131,5 +131,4 @@ def test_check_once_alerts_after_threshold_consecutive_failures(tmp_path, monkey
     result = check_once(fetch_days=boom, send_message=lambda msg: sent.append(msg))
 
     assert result == 1
-    assert len(sent) == 1
-    assert "3 vezes" in sent[0]
+    assert sent == []

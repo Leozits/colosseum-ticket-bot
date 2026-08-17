@@ -6,7 +6,7 @@ import sys
 from patchright.sync_api import sync_playwright
 
 from colosseum_monitor import config
-from colosseum_monitor.notifier import format_availability_message, format_failure_message
+from colosseum_monitor.notifier import format_availability_message
 from colosseum_monitor.calendar_client import (
     advance_to_max_month,
     read_visible_month_days,
@@ -21,7 +21,6 @@ def check_once(fetch_days=None, send_message=None, now=None):
     return _engine_check_once(
         config,
         format_availability_message=lambda dates, slots: format_availability_message(dates, slots, config.TICKET_URL),
-        format_failure_message=format_failure_message,
         fetch_days=fetch_days or _real_fetch_days,
         send_message=send_message or _real_send_message,
         now=now,

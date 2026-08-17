@@ -1,5 +1,10 @@
 """Generic run-once engine shared by every ticket monitor: load state, fetch,
-diff, log, notify, save state -- with a consecutive-failure alert threshold.
+diff, log, notify, save state.
+
+Failures are logged and counted (consecutive_failures in state.json) but
+never trigger a notification -- the user only wants to hear about actual
+ticket availability, not the monitor's own health. A run that fails
+repeatedly for hours just accumulates silent ERROR log lines instead.
 """
 
 from datetime import date, datetime, timezone
@@ -26,13 +31,11 @@ def _notify_safely(config, send_message, content, timestamp):
         append_log(config.LOG_PATH, format_error_log_line(timestamp, f"notification failed: {exc}"))
 
 
-def check_once(config, format_availability_message, format_failure_message, fetch_days, send_message, now=None):
+def check_once(config, format_availability_message, fetch_days, send_message, now=None):
     """Run one availability check for a single site. Dependencies are injectable for testing.
 
-    config: object/module with STATE_PATH, LOG_PATH, MONITOR_END_DATE,
-            CONSECUTIVE_FAILURES_ALERT_THRESHOLD attributes.
+    config: object/module with STATE_PATH, LOG_PATH, MONITOR_END_DATE attributes.
     format_availability_message: callable(newly_available_dates, slots_by_date) -> str
-    format_failure_message: callable(consecutive_failures, error_message) -> str
     fetch_days: callable() -> {"statuses": dict[date_str, status],
                                 "slots": dict[date_str, dict[time_str, status]]}
     send_message: callable(str) -> None
@@ -52,13 +55,6 @@ def check_once(config, format_availability_message, format_failure_message, fetc
     except Exception as exc:
         consecutive_failures = previous["consecutive_failures"] + 1
         append_log(config.LOG_PATH, format_error_log_line(timestamp, str(exc)))
-        # Alert exactly once per failure streak (== not >=) -- an outage that
-        # drags on for hours must not re-send this alert every 5 minutes.
-        # Confirmed the hard way: a stuck Louvre monitor burned through
-        # CallMeBot's free-tier message quota by re-alerting on every single
-        # failed run once past the threshold.
-        if consecutive_failures == config.CONSECUTIVE_FAILURES_ALERT_THRESHOLD:
-            _notify_safely(config, send_message, format_failure_message(consecutive_failures, str(exc)), timestamp)
         save_state(
             config.STATE_PATH,
             {

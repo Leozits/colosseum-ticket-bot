@@ -9,7 +9,5 @@ MONITOR_END_DATE = "2026-10-25"
 STATE_PATH = "state.json"
 LOG_PATH = "log.txt"
 
-CONSECUTIVE_FAILURES_ALERT_THRESHOLD = 3
-
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587

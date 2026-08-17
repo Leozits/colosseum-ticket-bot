@@ -10,7 +10,6 @@ def _config(tmp_path, **overrides):
         STATE_PATH=str(tmp_path / "state.json"),
         LOG_PATH=str(tmp_path / "log.txt"),
         MONITOR_END_DATE="2099-01-01",
-        CONSECUTIVE_FAILURES_ALERT_THRESHOLD=3,
     )
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -24,10 +23,6 @@ def _format_availability_message(dates, slots):
     return "AVAILABLE:" + ",".join(dates)
 
 
-def _format_failure_message(consecutive_failures, error_message):
-    return f"FAILED:{consecutive_failures}:{error_message}"
-
-
 def test_check_once_logs_and_does_not_notify_when_nothing_changed(tmp_path):
     config = _config(tmp_path)
     days = {"2026-09-12": "soldout", "2026-09-13": "closing"}
@@ -36,7 +31,7 @@ def test_check_once_logs_and_does_not_notify_when_nothing_changed(tmp_path):
 
     sent = []
     result = check_once(
-        config, _format_availability_message, _format_failure_message,
+        config, _format_availability_message,
         fetch_days=lambda: _result(days), send_message=lambda msg: sent.append(msg),
     )
 
@@ -53,7 +48,7 @@ def test_check_once_notifies_when_a_date_becomes_available(tmp_path):
 
     sent = []
     result = check_once(
-        config, _format_availability_message, _format_failure_message,
+        config, _format_availability_message,
         fetch_days=lambda: _result({"2026-09-13": "available"}),
         send_message=lambda msg: sent.append(msg),
     )
@@ -71,7 +66,7 @@ def test_check_once_still_saves_state_when_notification_fails(tmp_path):
         raise ConnectionError("smtp unreachable")
 
     result = check_once(
-        config, _format_availability_message, _format_failure_message,
+        config, _format_availability_message,
         fetch_days=lambda: _result({"2026-09-13": "available"}), send_message=broken_send,
     )
 
@@ -87,7 +82,7 @@ def test_check_once_skips_entirely_after_monitor_end_date(tmp_path):
 
     calls = []
     result = check_once(
-        config, _format_availability_message, _format_failure_message,
+        config, _format_availability_message,
         fetch_days=lambda: calls.append(1), send_message=lambda m: None,
     )
 
@@ -96,7 +91,7 @@ def test_check_once_skips_entirely_after_monitor_end_date(tmp_path):
     assert not os.path.exists(config.STATE_PATH)
 
 
-def test_check_once_logs_error_and_counts_failures_without_crashing(tmp_path):
+def test_check_once_logs_failure_and_counts_it_without_alerting(tmp_path):
     config = _config(tmp_path)
 
     def boom():
@@ -104,7 +99,7 @@ def test_check_once_logs_error_and_counts_failures_without_crashing(tmp_path):
 
     sent = []
     result = check_once(
-        config, _format_availability_message, _format_failure_message,
+        config, _format_availability_message,
         fetch_days=boom, send_message=lambda msg: sent.append(msg),
     )
 
@@ -112,39 +107,25 @@ def test_check_once_logs_error_and_counts_failures_without_crashing(tmp_path):
     assert sent == []
     with open(config.STATE_PATH) as f:
         assert json.load(f)["consecutive_failures"] == 1
+    with open(config.LOG_PATH) as f:
+        assert "ERROR site unreachable" in f.read()
 
 
-def test_check_once_alerts_after_threshold_consecutive_failures(tmp_path):
+def test_check_once_never_alerts_no_matter_how_many_consecutive_failures(tmp_path):
     config = _config(tmp_path)
     with open(config.STATE_PATH, "w") as f:
-        json.dump({"day_statuses": {}, "available_slots": {}, "consecutive_failures": 2}, f)
+        json.dump({"day_statuses": {}, "available_slots": {}, "consecutive_failures": 10}, f)
 
     def boom():
         raise RuntimeError("site unreachable")
 
     sent = []
     result = check_once(
-        config, _format_availability_message, _format_failure_message,
-        fetch_days=boom, send_message=lambda msg: sent.append(msg),
-    )
-
-    assert result == 1
-    assert sent == ["FAILED:3:site unreachable"]
-
-
-def test_check_once_does_not_realert_on_further_consecutive_failures(tmp_path):
-    config = _config(tmp_path)
-    with open(config.STATE_PATH, "w") as f:
-        json.dump({"day_statuses": {}, "available_slots": {}, "consecutive_failures": 5}, f)
-
-    def boom():
-        raise RuntimeError("site unreachable")
-
-    sent = []
-    result = check_once(
-        config, _format_availability_message, _format_failure_message,
+        config, _format_availability_message,
         fetch_days=boom, send_message=lambda msg: sent.append(msg),
     )
 
     assert result == 1
     assert sent == []
+    with open(config.STATE_PATH) as f:
+        assert json.load(f)["consecutive_failures"] == 11

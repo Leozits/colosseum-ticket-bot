@@ -19,7 +19,5 @@ MONITOR_END_DATE = "2026-10-19"
 STATE_PATH = os.path.join(_PACKAGE_DIR, "state.json")
 LOG_PATH = os.path.join(_PACKAGE_DIR, "log.txt")
 
-CONSECUTIVE_FAILURES_ALERT_THRESHOLD = 3
-
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587

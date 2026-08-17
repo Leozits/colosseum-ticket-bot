@@ -6,7 +6,7 @@ import sys
 from patchright.sync_api import sync_playwright
 
 from louvre_monitor import config
-from louvre_monitor.messages import format_availability_message, format_failure_message
+from louvre_monitor.messages import format_availability_message
 from louvre_monitor.calendar_client import navigate_to_month, read_month_days
 from monitor_common.engine import check_once as _engine_check_once
 from monitor_common.notifier import send_whatsapp_message, send_email_message
@@ -16,7 +16,6 @@ def check_once(fetch_days=None, send_message=None, now=None):
     return _engine_check_once(
         config,
         format_availability_message=lambda dates, slots: format_availability_message(dates, config.TICKET_URL),
-        format_failure_message=format_failure_message,
         fetch_days=fetch_days or _real_fetch_days,
         send_message=send_message or _real_send_message,
         now=now,
