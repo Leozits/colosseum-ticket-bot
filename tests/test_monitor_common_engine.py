@@ -130,3 +130,21 @@ def test_check_once_alerts_after_threshold_consecutive_failures(tmp_path):
 
     assert result == 1
     assert sent == ["FAILED:3:site unreachable"]
+
+
+def test_check_once_does_not_realert_on_further_consecutive_failures(tmp_path):
+    config = _config(tmp_path)
+    with open(config.STATE_PATH, "w") as f:
+        json.dump({"day_statuses": {}, "available_slots": {}, "consecutive_failures": 5}, f)
+
+    def boom():
+        raise RuntimeError("site unreachable")
+
+    sent = []
+    result = check_once(
+        config, _format_availability_message, _format_failure_message,
+        fetch_days=boom, send_message=lambda msg: sent.append(msg),
+    )
+
+    assert result == 1
+    assert sent == []

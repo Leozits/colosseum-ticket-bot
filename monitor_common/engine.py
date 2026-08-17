@@ -52,7 +52,12 @@ def check_once(config, format_availability_message, format_failure_message, fetc
     except Exception as exc:
         consecutive_failures = previous["consecutive_failures"] + 1
         append_log(config.LOG_PATH, format_error_log_line(timestamp, str(exc)))
-        if consecutive_failures >= config.CONSECUTIVE_FAILURES_ALERT_THRESHOLD:
+        # Alert exactly once per failure streak (== not >=) -- an outage that
+        # drags on for hours must not re-send this alert every 5 minutes.
+        # Confirmed the hard way: a stuck Louvre monitor burned through
+        # CallMeBot's free-tier message quota by re-alerting on every single
+        # failed run once past the threshold.
+        if consecutive_failures == config.CONSECUTIVE_FAILURES_ALERT_THRESHOLD:
             _notify_safely(config, send_message, format_failure_message(consecutive_failures, str(exc)), timestamp)
         save_state(
             config.STATE_PATH,
