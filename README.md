@@ -154,38 +154,31 @@ WHATSAPP_PHONE="<your number>" CALLMEBOT_API_KEY="<api key>" GMAIL_ADDRESS="<you
 trigger) for debugging — its scheduled cron trigger was removed because
 GitHub-hosted runners get the same WAF block described above.
 
-## Louvre monitor (paused — blocked longer than expected)
+## Louvre monitor
 
-**As of 2026-08-17 the `LouvreTicketMonitor` Scheduled Task is disabled,
-indefinitely this time.** Timeline:
+**Resolved as of 2026-08-25.** Full timeline, for the record:
 
-1. ~17:15 UTC: after heavy live testing during development, the site started
-   failing almost every run with `ERROR Calendar did not advance past
-   2026-08` — the Cloudflare challenge was passing, but calendar navigation
-   afterward wasn't. Paused for a 4-hour cooldown, expecting adaptive
-   rate-limiting to expire.
-2. ~22:03 UTC: auto-reactivated as planned. Still failing 100% of the time,
-   same error, no improvement from the cooldown.
-3. ~22:57 UTC: a single manual diagnostic check found it's actually gotten
-   *worse* — the Cloudflare "Just a moment..." interstitial itself now
-   doesn't resolve within 30 seconds (`Page.wait_for_selector: Timeout
-   30000ms exceeded ... waiting for locator(".d-month")`), where earlier
-   runs got past that step fine. This looks like a harder/longer-lived block
-   than a simple short-term rate limit, not something a few more hours will
-   necessarily fix — and not a code bug (`monitor_common`'s engine is
-   correctly logging every failure and retrying, exactly as designed).
-
-**A one-time retest is scheduled for 2026-08-18 20:20 local time** — a full
-24h after the block was last observed (a longer cooldown than the 4h one
-that already failed once). `LouvreTicketMonitor-Retest`
-(`scripts/retest_louvre.ps1`) runs the monitor exactly once at that time and
-only re-enables the regular 5-min `LouvreTicketMonitor` task if that single
-check actually logs a real `OK` line; if it still fails, it just leaves
-things disabled and removes itself, silently — no failure alerts are sent
-(see below), so check `louvre_monitor/log.txt` afterward yourself to see
-which way it went. If it's still blocked at that point, register another
-one-time retest further out rather than assuming a fixed cooldown will work
-— this one already needed adjusting once.
+1. 2026-08-17 ~17:15 UTC: after heavy live testing during development, the
+   site started failing almost every run with `ERROR Calendar did not
+   advance past 2026-08` — the Cloudflare challenge was passing, but
+   calendar navigation afterward wasn't.
+2. Two cooldowns (4h, then a planned 24h) were tried; the block was still
+   there after the first, and the second never actually ran — the one-time
+   `LouvreTicketMonitor-Retest` task was scheduled for 2026-08-18 20:20
+   local time but silently failed to launch at all (`LastTaskResult
+   2147946720`, a logon-session error), most likely because the task fired
+   while there was no interactive desktop session available for the
+   non-headless browser it needs. **Lesson for any future one-time retest
+   task like this: check `Get-ScheduledTaskInfo -TaskName <name> |
+   Select LastRunTime, LastTaskResult` afterward — a task that's still
+   sitting there unregistered, days later, means it never actually ran.**
+3. 2026-08-25: a manual check (a full week after the block was last
+   observed, not another rapid-fire test) succeeded cleanly — Cloudflare's
+   block had cleared on its own — **and found real availability**: all of
+   2026-10-14 through 2026-10-19 came back `available`, matching what the
+   Versailles monitor found for the same window on 2026-08-17. The
+   `LouvreTicketMonitor` Scheduled Task is re-enabled and back on its
+   normal 5-minute cadence.
 
 Same idea as the Colosseum monitor above, watching
 `https://ticket.louvre.fr/en/billetterie/3313` for dates 14–19 October 2026
