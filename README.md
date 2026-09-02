@@ -154,9 +154,13 @@ WHATSAPP_PHONE="<your number>" CALLMEBOT_API_KEY="<api key>" GMAIL_ADDRESS="<you
 trigger) for debugging — its scheduled cron trigger was removed because
 GitHub-hosted runners get the same WAF block described above.
 
-## Louvre monitor
+## Louvre monitor (disabled)
 
-**Resolved as of 2026-08-25.** Full timeline, for the record:
+**As of 2026-09-02 the `LouvreTicketMonitor` Scheduled Task is disabled at
+the user's request** — only the Colosseum monitor runs now. Re-enable with
+`Enable-ScheduledTask -TaskName "LouvreTicketMonitor"` if needed again.
+
+Full timeline up to that point, for the record:
 
 1. 2026-08-17 ~17:15 UTC: after heavy live testing during development, the
    site started failing almost every run with `ERROR Calendar did not
