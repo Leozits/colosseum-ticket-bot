@@ -251,3 +251,45 @@ confirmed remaining quota for the Passport ticket specifically (that would
 only be knowable further into the booking flow, which this monitor does not
 drive). Day-level only, same scope as the other two monitors — see the
 design doc for details.
+
+## Galleria Borghese monitor
+
+Watches `https://www.tosc.it/artist/galleria-borghese/galleria-borghese-2253937/`
+(TicketOne's platform) for the standard entry ticket, dates 22, 23, 24, 25,
+27 October 2026 (26 excluded — already booked for the Vatican).
+
+This site is behind **Akamai Bot Manager**, confirmed tougher than the
+other three WAFs in this repo — a bare HTTP request gets no response at
+all (the TCP connection resets immediately). There's no guaranteed
+workaround for Akamai's behavioral detection, only minimizing how bot-like
+this looks: same non-headless patchright technique as the Colosseum and
+Louvre monitors, but on a **30-minute cadence instead of 5 minutes**. The
+goal here is explicitly understanding the availability pattern over time
+(see the design doc), not catching a sub-5-minute window, so the gentler
+cadence costs little. First live run (2026-09-14) succeeded cleanly on the
+first try.
+
+Notifications are **email only** for this monitor (no WhatsApp attempt) —
+CallMeBot's free-tier quota is exhausted; add `send_whatsapp_message` back
+into `borghese_monitor/run.py`'s `_real_send_message` once that's resolved,
+following the pattern in the other monitors.
+
+The site's own 3-tier availability signal ("Disponibilità alta / moderata
+/ ridotta") is collapsed to a plain available/unavailable in the state and
+logs — see the design doc for why.
+
+Register its own Scheduled Task (independent of the other monitors, 30-min
+cadence):
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "<path to>\pythonw.exe" -Argument "-m borghese_monitor.run" -WorkingDirectory "<path to>\colosseum-ticket-bot"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 30) -RepetitionDuration (New-TimeSpan -Days 200)
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+Register-ScheduledTask -TaskName "BorgheseTicketMonitor" -Action $action -Trigger $trigger -Settings $settings -Description "Checks Galleria Borghese ticket calendar every 30 min; notifies by email only."
+```
+
+State and logs live in `borghese_monitor/state.json` and
+`borghese_monitor/log.txt`. If this monitor starts failing persistently
+(matching the Louvre monitor's Cloudflare-block history), disable the
+Scheduled Task and wait — do not guess a fixed cooldown and auto-reactivate
+on a timer; that already proved unreliable once.
