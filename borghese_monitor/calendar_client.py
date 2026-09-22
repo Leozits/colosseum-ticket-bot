@@ -34,9 +34,23 @@ def read_current_month(page):
     return int(year), _MONTH_NAMES.index(month_name.strip().lower()) + 1
 
 
+def _read_current_month_tolerantly(page):
+    """Retry read_current_month briefly -- confirmed by live testing: the
+    header text can transiently come back malformed (e.g. missing a space
+    between month name and year) right after a fresh page load, not just
+    mid-navigation, causing an unpack error in read_current_month.
+    """
+    for _ in range(20):
+        try:
+            return read_current_month(page)
+        except (AttributeError, ValueError):
+            page.wait_for_timeout(250)
+    return read_current_month(page)  # let the real exception surface
+
+
 def navigate_to_month(page, target_year, target_month):
     """Click the calendar's prev/next arrow until the target month is displayed."""
-    current_year, current_month = read_current_month(page)
+    current_year, current_month = _read_current_month_tolerantly(page)
     delta = (target_year * 12 + target_month) - (current_year * 12 + current_month)
     selector = (
         'button[aria-label="Vai al mese prossimo"]' if delta > 0
@@ -58,8 +72,8 @@ def navigate_to_month(page, target_year, target_month):
             page.wait_for_timeout(250)
             try:
                 year, month = read_current_month(page)
-            except AttributeError:
-                continue  # header briefly absent mid-re-render
+            except (AttributeError, ValueError):
+                continue  # header briefly absent or malformed mid-re-render
             if year * 12 + month == expected_total:
                 current_year, current_month = year, month
                 break

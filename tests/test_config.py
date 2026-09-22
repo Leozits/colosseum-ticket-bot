@@ -8,3 +8,8 @@ def test_target_dates_cover_the_trip_window_excluding_the_vatican_day():
 
 def test_monitor_end_date_covers_all_target_dates():
     assert config.MONITOR_END_DATE >= max(config.TARGET_DATES)
+
+
+def test_calendar_year_month_matches_the_target_dates():
+    prefix = f"{config.CALENDAR_YEAR}-{config.CALENDAR_MONTH:02d}-"
+    assert all(date.startswith(prefix) for date in config.TARGET_DATES)

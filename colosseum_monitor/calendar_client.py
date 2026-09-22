@@ -12,22 +12,70 @@ resulting DOM state.
 from colosseum_monitor.availability import parse_calendar_title, classify_day_status, classify_slot_status
 
 
-def advance_to_max_month(page):
-    """Click the calendar's "next month" arrow until the site's booking horizon is reached."""
-    while True:
-        button = page.query_selector(".ui-datepicker-next")
-        if not button:
-            break
+def read_current_month(page):
+    """Return (year, month) currently displayed in the calendar header."""
+    title_element = page.query_selector(".ui-datepicker-title")
+    if title_element is None:
+        raise ValueError("Calendar title not found on page")
+    return parse_calendar_title(title_element.inner_text())
+
+
+def _read_current_month_tolerantly(page):
+    """Retry read_current_month briefly -- confirmed by testing (on the
+    Borghese monitor) that a calendar header can be transiently absent or
+    malformed right after a fresh page load, not just mid-navigation.
+    """
+    for _ in range(20):
+        try:
+            return read_current_month(page)
+        except (AttributeError, ValueError):
+            page.wait_for_timeout(250)
+    return read_current_month(page)  # let the real exception surface
+
+
+def navigate_to_month(page, target_year, target_month):
+    """Click the calendar's next/prev arrow until the target month is displayed.
+
+    If the site's own booking horizon doesn't reach the target month yet
+    (the "next" arrow becomes disabled first), stops early and leaves the
+    calendar on whichever month it did reach -- read_visible_month_days will
+    then simply not find any of the target dates, the same "not on sale yet"
+    signal already used by the Louvre and Borghese monitors. This replaces
+    the previous "click next until disabled" approach, which silently lost
+    track of the target dates once the site's own horizon extended past them
+    (confirmed happening in production: the site jumped straight from
+    October to December in one batch release, and the old code just kept
+    following whatever the furthest month was instead of watching October).
+    """
+    current_year, current_month = _read_current_month_tolerantly(page)
+    delta = (target_year * 12 + target_month) - (current_year * 12 + current_month)
+    if delta == 0:
+        return
+    selector = ".ui-datepicker-next" if delta > 0 else ".ui-datepicker-prev"
+    step = 1 if delta > 0 else -1
+    for _ in range(abs(delta)):
+        button = page.query_selector(selector)
+        if button is None:
+            return
         css_class = button.get_attribute("class") or ""
         if "ui-state-disabled" in css_class:
-            break
-        # Various transient elements (loading overlay, sticky header, cookie
-        # banner) can sit on top of this button depending on timing; force=True
-        # dispatches the click at its location regardless -- still a real
-        # browser input event, just skipping Playwright's own "is anything
-        # covering this?" pre-click check.
+            return
+        expected_total = current_year * 12 + current_month + step
+        # force=True: various transient elements (loading overlay, sticky
+        # header, cookie banner) can sit on top of this button depending on
+        # timing -- same defensive click style already proven necessary.
         button.click(force=True)
-        page.wait_for_timeout(2500)
+        for _ in range(20):
+            page.wait_for_timeout(250)
+            try:
+                year, month = read_current_month(page)
+            except (AttributeError, ValueError):
+                continue  # header briefly absent or malformed mid-re-render
+            if year * 12 + month == expected_total:
+                current_year, current_month = year, month
+                break
+        else:
+            raise TimeoutError(f"Calendar did not advance past {current_year}-{current_month:02d}")
 
 
 def read_visible_month_days(page):

@@ -83,6 +83,26 @@ def test_navigate_to_month_raises_if_calendar_never_advances():
         navigate_to_month(page, 2026, 9)
 
 
+def test_navigate_to_month_tolerates_a_transiently_malformed_initial_header():
+    # Confirmed by live testing on the Borghese monitor: a calendar header
+    # can transiently come back malformed (e.g. an unrecognized/empty month
+    # name) right after a fresh page load, not just mid-navigation.
+    class FlakyOnceThenFinePage(FakePage):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._first_month_read = True
+
+        def query_selector(self, selector):
+            if selector == ".d-month" and self._first_month_read:
+                self._first_month_read = False
+                return FakeElement(text="")  # not in _MONTH_NAMES -> ValueError
+            return super().query_selector(selector)
+
+    page = FlakyOnceThenFinePage("August", 2026)
+    navigate_to_month(page, 2026, 10)
+    assert (page.year, page.month) == (2026, 10)
+
+
 def test_read_month_days_maps_disabled_attribute_to_unavailable():
     page = FakePage("October", 2026, day_elements=[
         FakeElement(attrs={"data-date": "2026-10-14T03:00:00.000Z"}),

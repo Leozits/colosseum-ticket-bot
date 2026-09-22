@@ -102,6 +102,27 @@ def test_navigate_to_month_raises_if_calendar_never_advances():
         navigate_to_month(page, 2026, 10)
 
 
+def test_navigate_to_month_tolerates_a_transiently_malformed_initial_header():
+    # Confirmed by live testing: the header text intermittently comes back
+    # with no space between month and year (e.g. right after a fresh page
+    # load), which used to crash read_current_month's rsplit-based parsing
+    # with "not enough values to unpack".
+    class FlakyOnceThenFinePage(FakeMonthPage):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._first_title_read = True
+
+        def query_selector(self, selector):
+            if selector == ".btn-today.text-center" and self._first_title_read:
+                self._first_title_read = False
+                return FakeElement(text="2026")  # no space -- rsplit(" ", 1) yields 1 item
+            return super().query_selector(selector)
+
+    page = FlakyOnceThenFinePage("Settembre", 2026)
+    navigate_to_month(page, 2026, 10)
+    assert (page.year, page.month) == (2026, 10)
+
+
 def test_read_month_days_maps_available_class_and_lists_real_slots():
     cell = FakeCell(
         day_span=FakeElement(attrs={"data-cal-date": "2026-10-23", "class": "day-number cal-event-status-available"}),

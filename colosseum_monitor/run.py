@@ -8,7 +8,7 @@ from patchright.sync_api import sync_playwright
 from colosseum_monitor import config
 from colosseum_monitor.notifier import format_availability_message
 from colosseum_monitor.calendar_client import (
-    advance_to_max_month,
+    navigate_to_month,
     read_visible_month_days,
     click_day,
     read_time_slots,
@@ -50,8 +50,9 @@ def _real_fetch_days():
             accept_cookies_button = page.query_selector("#cookie_action_close_header")
             if accept_cookies_button:
                 accept_cookies_button.click(force=True)
-            advance_to_max_month(page)
-            statuses = read_visible_month_days(page)
+            navigate_to_month(page, config.CALENDAR_YEAR, config.CALENDAR_MONTH)
+            all_days = read_visible_month_days(page)
+            statuses = {date: status for date, status in all_days.items() if date in config.TARGET_DATES}
 
             # Only "available" days are clickable at all (soldout/closing days
             # render as <span>, not <a>) -- so this only ever runs for the
