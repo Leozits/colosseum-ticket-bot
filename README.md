@@ -252,7 +252,11 @@ only be knowable further into the booking flow, which this monitor does not
 drive). Day-level only, same scope as the other two monitors — see the
 design doc for details.
 
-## Galleria Borghese monitor
+## Galleria Borghese monitor (disabled)
+
+**As of 2026-09-23 the `BorgheseTicketMonitor` Scheduled Task is disabled at
+the user's request.** Re-enable with
+`Enable-ScheduledTask -TaskName "BorgheseTicketMonitor"` if needed again.
 
 Watches `https://www.tosc.it/artist/galleria-borghese/galleria-borghese-2253937/`
 (TicketOne's platform) for the standard entry ticket, dates 22, 23, 24, 25,
