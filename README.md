@@ -1,5 +1,17 @@
 # Colosseum ticket availability monitor
 
+**As of 2026-09-25 the `ColosseumTicketMonitor` Scheduled Task is disabled
+— the user bought the ticket manually.** All four monitors in this repo
+(Colosseum, Louvre, Versailles, Galleria Borghese) are now paused. Re-enable
+with `Enable-ScheduledTask -TaskName "ColosseumTicketMonitor"` if needed
+again (e.g. a future trip). An in-progress feature to automatically add a
+newly-available slot to the cart
+(`docs/superpowers/specs/2026-09-24-colosseum-auto-add-to-cart-design.md`)
+was abandoned at the same time, for the same reason — its one committed
+piece (`colosseum_monitor/cart.py`) was reverted and never got wired into
+`run.py`; the design/plan docs are kept as a record but don't describe
+anything actually running.
+
 Watches the official Colosseum ticketing site's booking calendar and sends a
 WhatsApp message and an email the moment any date's status changes to
 "available" — including exactly which visit times are bookable that day —
